@@ -73,7 +73,17 @@ h1 {
   margin: 0 auto;
   aspect-ratio: 1;
 }
-canvas { width: 100%; height: 100%; display: block; }
+canvas { width: 100%; height: 100%; display: block; cursor: pointer; touch-action: manipulation; }
+.wheel-hint { text-align: center; color: var(--muted); font-size: 0.88rem; margin: 10px 0 0; }
+.hidden-list { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.hidden-list button {
+  font: inherit; font-size: 0.9rem; padding: 2px 10px; border-radius: 4px; cursor: pointer;
+  background: var(--surface); color: var(--muted); border: 1.5px dashed var(--line);
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+.hidden-list button:hover { color: var(--ink); text-decoration: none; }
+.hidden-list button:focus-visible { outline: 2px solid var(--shu); outline-offset: 2px; }
+.hidden-block { margin-bottom: 24px; }
 .pointer {
   position: absolute;
   top: -6px;
@@ -177,6 +187,7 @@ legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
       </svg>
       <button class="hub" id="spin" type="button">回す</button>
     </div>
+    <p class="wheel-hint">都道府県名をクリックすると、ルーレットから外せます</p>
   </section>
 
   <section>
@@ -197,6 +208,15 @@ legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
     </label>
     <p class="count" id="count"></p>
     <p class="empty-note" id="emptyNote" hidden></p>
+
+    <div class="hidden-block" id="hiddenBlock" hidden>
+      <div class="history-head">
+        <h2>非表示にした都道府県</h2>
+        <button class="text-btn" id="restoreAll" type="button">すべて戻す</button>
+      </div>
+      <ul class="hidden-list" id="hiddenList"></ul>
+      <p class="history-empty">クリックすると1つずつ戻せます</p>
+    </div>
 
     <div class="history-head">
       <h2>これまでの結果</h2>
@@ -246,6 +266,7 @@ const state = {
   regions: new Set(REGIONS.map(r => r.id)),
   exclude: false,
   drawn: new Set(),
+  hidden: new Set(),
   history: [],
   rot: -Math.PI / 2,
   spinning: false
@@ -257,7 +278,7 @@ const spinBtn = $("spin");
 let size = 0, dpr = 1;
 
 function activeList() {
-  return PREFS.filter(p => state.regions.has(p.region) && !(state.exclude && state.drawn.has(p.name)));
+  return PREFS.filter(p => state.regions.has(p.region) && !state.hidden.has(p.name) && !(state.exclude && state.drawn.has(p.name)));
 }
 
 function resize() {
@@ -389,10 +410,29 @@ function renderSide() {
   const note = $("emptyNote");
   if (list.length === 0) {
     note.hidden = false;
+    const remaining = PREFS.filter(p => state.regions.has(p.region) && !state.hidden.has(p.name));
     note.textContent = state.regions.size === 0
       ? "地方を1つ以上選んでください。"
-      : "選んだ地方はすべて出ました。リセットするとまた回せます。";
+      : remaining.length === 0
+        ? "すべて非表示になっています。下の一覧から戻してください。"
+        : "選んだ地方はすべて出ました。リセットするとまた回せます。";
   } else note.hidden = true;
+
+  const hl = $("hiddenList");
+  hl.innerHTML = "";
+  PREFS.filter(p => state.hidden.has(p.name)).forEach(p => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = p.name;
+    b.setAttribute("aria-label", `${p.name}をルーレットに戻す`);
+    b.addEventListener("click", () => {
+      if (state.spinning) return;
+      state.hidden.delete(p.name); renderSide(); draw();
+    });
+    li.append(b); hl.append(li);
+  });
+  $("hiddenBlock").hidden = state.hidden.size === 0;
   spinBtn.disabled = state.spinning || list.length === 0;
 
   const ul = $("history");
@@ -407,6 +447,27 @@ function renderSide() {
 }
 
 spinBtn.addEventListener("click", spin);
+canvas.addEventListener("click", e => {
+  if (state.spinning) return;
+  const list = activeList();
+  if (list.length === 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left - rect.width / 2;
+  const y = e.clientY - rect.top - rect.height / 2;
+  const dist = Math.hypot(x, y), r = rect.width / 2 - 4;
+  if (dist > r || dist < r * 0.3) return;
+  const TAU = Math.PI * 2;
+  const rel = ((Math.atan2(y, x) - state.rot) % TAU + TAU) % TAU;
+  const idx = Math.floor(rel / (TAU / list.length));
+  const p = list[idx];
+  if (!p) return;
+  state.hidden.add(p.name);
+  renderSide(); draw();
+});
+$("restoreAll").addEventListener("click", () => {
+  if (state.spinning) return;
+  state.hidden.clear(); renderSide(); draw();
+});
 $("exclude").addEventListener("change", e => {
   if (state.spinning) { e.target.checked = state.exclude; return; }
   state.exclude = e.target.checked; renderSide(); draw();
