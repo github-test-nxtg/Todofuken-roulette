@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>都道府県ルーレット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #E9EDF2;
+  --surface: #F8FAFC;
+  --ink: #1B2433;
+  --muted: #5A6577;
+  --line: #C9D1DC;
+  --shu: #C8402A;
+  --shu-ink: #FFFFFF;
+  --hub: #1B2433;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121823;
+    --surface: #1A2230;
+    --ink: #E6EAF0;
+    --muted: #9AA5B6;
+    --line: #2E3A4D;
+    --shu: #E0573F;
+    --hub: #E6EAF0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121823; --surface: #1A2230; --ink: #E6EAF0; --muted: #9AA5B6;
+  --line: #2E3A4D; --shu: #E0573F; --hub: #E6EAF0; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  line-height: 1.6;
+}
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  main { grid-template-columns: 1fr; gap: 24px; padding-top: 16px; }
+}
+h1 {
+  font-family: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-weight: 400;
+  font-size: 1.25rem;
+  margin: 0 0 4px;
+  letter-spacing: 0.04em;
+}
+.wheel-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  aspect-ratio: 1;
+}
+canvas { width: 100%; height: 100%; display: block; }
+.pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 34px;
+  height: 44px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+  pointer-events: none;
+}
+.hub {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 26%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: none;
+  background: var(--shu);
+  color: var(--shu-ink);
+  font-family: "Dela Gothic One", "Hiragino Sans", sans-serif;
+  font-size: clamp(1rem, 4.2vw, 1.5rem);
+  cursor: pointer;
+  box-shadow: 0 0 0 6px var(--surface), 0 4px 14px rgba(0,0,0,0.25);
+  transition: transform 0.15s ease;
+}
+.hub:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.04); }
+.hub:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.97); }
+.hub:disabled { cursor: default; opacity: 0.85; }
+.hub:focus-visible { outline: 3px solid var(--ink); outline-offset: 8px; }
+
+.result {
+  min-height: 9.5rem;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+.result-name {
+  font-family: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: clamp(3rem, 11vw, 5.5rem);
+  line-height: 1.1;
+  margin: 8px 0 4px;
+  word-break: keep-all;
+}
+.result-name.waiting { color: var(--muted); font-size: clamp(1.6rem, 6vw, 2.4rem); }
+.result-name.pop { animation: pop 0.45s cubic-bezier(.2,1.4,.4,1); }
+@keyframes pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.result-meta { color: var(--muted); font-size: 1rem; margin: 0; }
+.region-dot {
+  display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%;
+  margin-right: 0.4em; vertical-align: 0.02em;
+}
+
+fieldset { border: 0; padding: 0; margin: 0 0 20px; }
+legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 0.92rem; cursor: pointer;
+}
+.chip[aria-pressed="false"] { opacity: 0.45; }
+.chip[aria-pressed="false"] .region-dot { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--muted); }
+.chip:focus-visible, .text-btn:focus-visible, input:focus-visible { outline: 2px solid var(--shu); outline-offset: 2px; }
+.chip .region-dot { margin: 0; }
+
+.option { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
+.option input { width: 18px; height: 18px; accent-color: var(--shu); }
+.count { color: var(--muted); font-size: 0.9rem; margin: 0 0 20px; }
+
+.history-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.history-head h2 { font-size: 1rem; margin: 0; }
+.text-btn {
+  background: none; border: 0; padding: 4px 0; font: inherit; font-size: 0.9rem;
+  color: var(--shu); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.history { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.history li {
+  font-size: 0.9rem; padding: 2px 10px; border-radius: 4px;
+  background: var(--surface); border-left: 4px solid var(--line);
+}
+.history-empty { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.empty-note { color: var(--shu); font-weight: 700; margin: 0 0 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .result-name.pop { animation: none; }
+  .hub { transition: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <section aria-label="ルーレット">
+    <div class="wheel-wrap">
+      <canvas id="wheel" aria-hidden="true"></canvas>
+      <svg class="pointer" viewBox="0 0 34 44" aria-hidden="true">
+        <path d="M17 44 L2 10 A15 15 0 1 1 32 10 Z" fill="var(--shu)"/>
+        <circle cx="17" cy="14" r="5" fill="var(--surface)"/>
+      </svg>
+      <button class="hub" id="spin" type="button">回す</button>
+    </div>
+  </section>
+
+  <section>
+    <h1>都道府県ルーレット</h1>
+    <div class="result" aria-live="polite">
+      <p class="result-name waiting" id="resultName">どこが出るかな</p>
+      <p class="result-meta" id="resultMeta">真ん中のボタンを押してください</p>
+    </div>
+
+    <fieldset>
+      <legend>対象の地方</legend>
+      <div class="chips" id="chips"></div>
+    </fieldset>
+
+    <label class="option">
+      <input type="checkbox" id="exclude">
+      出た都道府県を次から除く
+    </label>
+    <p class="count" id="count"></p>
+    <p class="empty-note" id="emptyNote" hidden></p>
+
+    <div class="history-head">
+      <h2>これまでの結果</h2>
+      <button class="text-btn" id="reset" type="button">リセット</button>
+    </div>
+    <ul class="history" id="history"></ul>
+    <p class="history-empty" id="historyEmpty">まだ回していません</p>
+  </section>
+</main>
+
+<script>
+const REGIONS = [
+  { id: "hokkaido", name: "北海道", color: "#5B8DB8", text: "#FFFFFF" },
+  { id: "tohoku",   name: "東北",   color: "#4A7C6F", text: "#FFFFFF" },
+  { id: "kanto",    name: "関東",   color: "#B5654D", text: "#FFFFFF" },
+  { id: "chubu",    name: "中部",   color: "#6F8034", text: "#FFFFFF" },
+  { id: "kinki",    name: "近畿",   color: "#875687", text: "#FFFFFF" },
+  { id: "chugoku",  name: "中国",   color: "#D4A43A", text: "#2A1F05" },
+  { id: "shikoku",  name: "四国",   color: "#3C6696", text: "#FFFFFF" },
+  { id: "kyushu",   name: "九州・沖縄", color: "#2C8783", text: "#FFFFFF" }
+];
+const P = (name, capital, region) => ({ name, capital, region });
+const PREFS = [
+  P("北海道","札幌市","hokkaido"),
+  P("青森県","青森市","tohoku"), P("岩手県","盛岡市","tohoku"), P("宮城県","仙台市","tohoku"),
+  P("秋田県","秋田市","tohoku"), P("山形県","山形市","tohoku"), P("福島県","福島市","tohoku"),
+  P("茨城県","水戸市","kanto"), P("栃木県","宇都宮市","kanto"), P("群馬県","前橋市","kanto"),
+  P("埼玉県","さいたま市","kanto"), P("千葉県","千葉市","kanto"), P("東京都","新宿区","kanto"),
+  P("神奈川県","横浜市","kanto"),
+  P("新潟県","新潟市","chubu"), P("富山県","富山市","chubu"), P("石川県","金沢市","chubu"),
+  P("福井県","福井市","chubu"), P("山梨県","甲府市","chubu"), P("長野県","長野市","chubu"),
+  P("岐阜県","岐阜市","chubu"), P("静岡県","静岡市","chubu"), P("愛知県","名古屋市","chubu"),
+  P("三重県","津市","kinki"), P("滋賀県","大津市","kinki"), P("京都府","京都市","kinki"),
+  P("大阪府","大阪市","kinki"), P("兵庫県","神戸市","kinki"), P("奈良県","奈良市","kinki"),
+  P("和歌山県","和歌山市","kinki"),
+  P("鳥取県","鳥取市","chugoku"), P("島根県","松江市","chugoku"), P("岡山県","岡山市","chugoku"),
+  P("広島県","広島市","chugoku"), P("山口県","山口市","chugoku"),
+  P("徳島県","徳島市","shikoku"), P("香川県","高松市","shikoku"), P("愛媛県","松山市","shikoku"),
+  P("高知県","高知市","shikoku"),
+  P("福岡県","福岡市","kyushu"), P("佐賀県","佐賀市","kyushu"), P("長崎県","長崎市","kyushu"),
+  P("熊本県","熊本市","kyushu"), P("大分県","大分市","kyushu"), P("宮崎県","宮崎市","kyushu"),
+  P("鹿児島県","鹿児島市","kyushu"), P("沖縄県","那覇市","kyushu")
+];
+const regionById = Object.fromEntries(REGIONS.map(r => [r.id, r]));
+
+const state = {
+  regions: new Set(REGIONS.map(r => r.id)),
+  exclude: false,
+  drawn: new Set(),
+  history: [],
+  rot: -Math.PI / 2,
+  spinning: false
+};
+
+const $ = id => document.getElementById(id);
+const canvas = $("wheel"), ctx = canvas.getContext("2d");
+const spinBtn = $("spin");
+let size = 0, dpr = 1;
+
+function activeList() {
+  return PREFS.filter(p => state.regions.has(p.region) && !(state.exclude && state.drawn.has(p.name)));
+}
+
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  size = rect.width;
+  canvas.width = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  draw();
+}
+
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function draw() {
+  const list = activeList();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, size, size);
+  const c = size / 2, r = c - 4;
+  ctx.beginPath(); ctx.arc(c, c, r + 2, 0, Math.PI * 2);
+  ctx.fillStyle = cssVar("--surface"); ctx.fill();
+
+  if (list.length === 0) {
+    ctx.beginPath(); ctx.arc(c, c, r - 4, 0, Math.PI * 2);
+    ctx.fillStyle = cssVar("--line"); ctx.fill();
+    return;
+  }
+  const seg = (Math.PI * 2) / list.length;
+  const fontSize = Math.max(9, Math.min(size * 0.034, (r * 0.78) * seg * 0.62, 22));
+  list.forEach((p, i) => {
+    const reg = regionById[p.region];
+    const a0 = state.rot + i * seg, a1 = a0 + seg;
+    ctx.beginPath(); ctx.moveTo(c, c); ctx.arc(c, c, r - 2, a0, a1); ctx.closePath();
+    ctx.fillStyle = reg.color;
+    ctx.globalAlpha = (i % 2 === 0) ? 1 : 0.86;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    if (list.length > 1) {
+      ctx.strokeStyle = cssVar("--surface"); ctx.lineWidth = list.length > 30 ? 1 : 2; ctx.stroke();
+    }
+    ctx.save();
+    ctx.translate(c, c);
+    ctx.rotate(a0 + seg / 2);
+    ctx.fillStyle = reg.text;
+    ctx.font = `700 ${fontSize}px "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif`;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillText(p.name, r - 14, 0);
+    ctx.restore();
+  });
+}
+
+function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+
+function spin() {
+  const list = activeList();
+  if (state.spinning || list.length === 0) return;
+  state.spinning = true;
+  spinBtn.disabled = true;
+  const name = $("resultName");
+  name.className = "result-name waiting";
+  name.textContent = "……";
+  $("resultMeta").textContent = "回っています";
+
+  const idx = Math.floor(Math.random() * list.length);
+  const seg = (Math.PI * 2) / list.length;
+  const jitter = (Math.random() - 0.5) * seg * 0.7;
+  const target = -Math.PI / 2 - (idx + 0.5) * seg + jitter;
+  const TAU = Math.PI * 2;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const turns = reduce ? 1 : 6 + Math.floor(Math.random() * 3);
+  const start = state.rot;
+  let end = target;
+  while (end < start + turns * TAU) end += TAU;
+  const dur = reduce ? 700 : 4800 + Math.random() * 800;
+  const t0 = performance.now();
+
+  function frame(now) {
+    const t = Math.min(1, (now - t0) / dur);
+    state.rot = start + (end - start) * easeOut(t);
+    draw();
+    if (t < 1) requestAnimationFrame(frame);
+    else finish(list[idx]);
+  }
+  requestAnimationFrame(frame);
+}
+
+function finish(p) {
+  state.rot = state.rot % (Math.PI * 2);
+  state.spinning = false;
+  const reg = regionById[p.region];
+  const name = $("resultName");
+  name.className = "result-name";
+  void name.offsetWidth;
+  name.classList.add("pop");
+  name.textContent = p.name;
+  const meta = $("resultMeta");
+  meta.innerHTML = "";
+  const dot = document.createElement("span");
+  dot.className = "region-dot"; dot.style.background = reg.color;
+  meta.append(dot, `${reg.name}地方　${p.name === "東京都" ? "都庁所在地" : (p.name === "北海道" ? "道庁所在地" : (p.name.endsWith("府") ? "府庁所在地" : "県庁所在地"))}は${p.capital}`);
+  state.history.unshift(p);
+  state.drawn.add(p.name);
+  renderSide();
+  draw();
+}
+
+function renderChips() {
+  const wrap = $("chips");
+  wrap.innerHTML = "";
+  REGIONS.forEach(r => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip";
+    b.setAttribute("aria-pressed", state.regions.has(r.id));
+    const dot = document.createElement("span");
+    dot.className = "region-dot"; dot.style.background = r.color;
+    b.append(dot, r.name);
+    b.addEventListener("click", () => {
+      if (state.spinning) return;
+      state.regions.has(r.id) ? state.regions.delete(r.id) : state.regions.add(r.id);
+      b.setAttribute("aria-pressed", state.regions.has(r.id));
+      renderSide(); draw();
+    });
+    wrap.append(b);
+  });
+}
+
+function renderSide() {
+  const list = activeList();
+  $("count").textContent = `ルーレットに入っているのは ${list.length} / 47`;
+  const note = $("emptyNote");
+  if (list.length === 0) {
+    note.hidden = false;
+    note.textContent = state.regions.size === 0
+      ? "地方を1つ以上選んでください。"
+      : "選んだ地方はすべて出ました。リセットするとまた回せます。";
+  } else note.hidden = true;
+  spinBtn.disabled = state.spinning || list.length === 0;
+
+  const ul = $("history");
+  ul.innerHTML = "";
+  state.history.forEach(p => {
+    const li = document.createElement("li");
+    li.textContent = p.name;
+    li.style.borderLeftColor = regionById[p.region].color;
+    ul.append(li);
+  });
+  $("historyEmpty").hidden = state.history.length > 0;
+}
+
+spinBtn.addEventListener("click", spin);
+$("exclude").addEventListener("change", e => {
+  if (state.spinning) { e.target.checked = state.exclude; return; }
+  state.exclude = e.target.checked; renderSide(); draw();
+});
+$("reset").addEventListener("click", () => {
+  if (state.spinning) return;
+  state.history = []; state.drawn.clear();
+  const name = $("resultName");
+  name.className = "result-name waiting"; name.textContent = "どこが出るかな";
+  $("resultMeta").textContent = "真ん中のボタンを押してください";
+  renderSide(); draw();
+});
+document.addEventListener("keydown", e => {
+  if ((e.key === " " || e.key === "Enter") && document.activeElement === document.body) { e.preventDefault(); spin(); }
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+new ResizeObserver(resize).observe(canvas);
+
+renderChips();
+renderSide();
+resize();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
